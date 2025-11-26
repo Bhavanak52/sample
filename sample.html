@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Rama Taraka Mantra – Japa Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f5f5f5;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .card {
+      background: #fff;
+      padding: 1.7rem;
+      border-radius: 1rem;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 480px;
+    }
+    h1, h2 {
+      text-align: center;
+      margin-top: 0;
+    }
+    input, button {
+      width: 100%;
+      padding: 0.7rem;
+      border-radius: 0.5rem;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+      margin-top: 0.5rem;
+      font-size: 1rem;
+    }
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #1d4ed8;
+    }
+    .small-btn {
+      width: auto;
+      padding: 0.4rem 0.8rem;
+      margin: 0.2rem;
+      background: #e5e7eb;
+      color: #111;
+    }
+    table {
+      width: 100%;
+      margin-top: 1rem;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    th, td {
+      padding: 0.4rem;
+      border-bottom: 1px solid #ddd;
+    }
+    th {
+      background: #f0f0f0;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+
+    <!-- Login Page -->
+    <div id="login-view">
+      <h1>Rama Taraka Mantra</h1>
+      <p style="text-align:center;">Enter your name</p>
+      <form id="login-form">
+        <input type="text" id="name-input" required placeholder="Your name" />
+        <button type="submit">Continue</button>
+      </form>
+    </div>
+
+    <!-- Tracker Page -->
+    <div id="tracker-view" style="display:none;">
+      <button id="logout-btn" class="small-btn">Change Name</button>
+
+      <h2>Japa Tracker</h2>
+      <p style="text-align:center;">Logged in as <b id="user-name-display"></b></p>
+
+      <h3>Today</h3>
+      <p style="text-align:center;">
+        <span id="today-count" style="font-size:1.6rem; font-weight:bold;">0</span>
+      </p>
+
+      <div style="display:flex; justify-content:center;">
+        <button class="small-btn add-btn" data-step="1">+1</button>
+        <button class="small-btn add-btn" data-step="10">+10</button>
+        <button class="small-btn add-btn" data-step="108">+108</button>
+      </div>
+
+      <input type="number" id="custom-input" placeholder="Custom count" />
+      <button id="add-custom-btn">Add</button>
+      <button id="reset-today-btn" class="small-btn">Reset Today</button>
+
+      <h3>Date-wise Log</h3>
+      <table id="log-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Count</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+    </div>
+  </div>
+
+  <script>
+    function todayKey() {
+      const d = new Date();
+      return d.toISOString().slice(0, 10); // YYYY-MM-DD
+    }
+
+    function loadData(name) {
+      const key = "japa_user_" + name.toLowerCase();
+      const stored = localStorage.getItem(key);
+      return stored ? JSON.parse(stored) : { name, daily: {} };
+    }
+
+    function saveData(data) {
+      const key = "japa_user_" + data.name.toLowerCase();
+      localStorage.setItem(key, JSON.stringify(data));
+    }
+
+    let user = null;
+
+    const loginView = document.getElementById("login-view");
+    const trackerView = document.getElementById("tracker-view");
+
+    const loginForm = document.getElementById("login-form");
+    const nameInput = document.getElementById("name-input");
+
+    const userNameDisplay = document.getElementById("user-name-display");
+    const todayCountEl = document.getElementById("today-count");
+    const logTableBody = document.querySelector("#log-table tbody");
+
+    loginForm.addEventListener("submit", e => {
+      e.preventDefault();
+      const name = nameInput.value.trim();
+      if (!name) return;
+
+      user = loadData(name);
+      nameInput.value = "";
+      
+      loginView.style.display = "none";
+      trackerView.style.display = "block";
+
+      userNameDisplay.textContent = user.name;
+
+      updateUI();
+    });
+
+    document.getElementById("logout-btn").onclick = () => {
+      trackerView.style.display = "none";
+      loginView.style.display = "block";
+      user = null;
+    };
+
+    // Add buttons
+    document.querySelectorAll(".add-btn").forEach(btn => {
+      btn.onclick = () => addCount(parseInt(btn.dataset.step));
+    });
+
+    document.getElementById("add-custom-btn").onclick = () => {
+      const val = parseInt(document.getElementById("custom-input").value);
+      if (val > 0) addCount(val);
+      document.getElementById("custom-input").value = "";
+    };
+
+    document.getElementById("reset-today-btn").onclick = () => {
+      const key = todayKey();
+      if (user.daily[key]) {
+        if (confirm("Reset today's count?")) {
+          user.daily[key] = 0;
+          saveData(user);
+          updateUI();
+        }
+      }
+    };
+
+    function addCount(n) {
+      const key = todayKey();
+      if (!user.daily[key]) user.daily[key] = 0;
+      user.daily[key] += n;
+      saveData(user);
+      updateUI();
+    }
+
+    function updateUI() {
+      const key = todayKey();
+      todayCountEl.textContent = user.daily[key] || 0;
+
+      // Fill date-wise table
+      logTableBody.innerHTML = "";
+      const dates = Object.keys(user.daily).sort().reverse();
+      dates.forEach(date => {
+        const row = `<tr><td>${date}</td><td>${user.daily[date]}</td></tr>`;
+        logTableBody.innerHTML += row;
+      });
+    }
+  </script>
+
+</body>
+</html>
